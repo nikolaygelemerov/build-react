@@ -1,0 +1,27 @@
+button {
+  display: inline-block;
+  margin: 10px;
+  padding: 10px;
+  color: white;
+  text-decoration: none;
+  text-align: center;
+  background-color: black;
+  box-shadow: rgb(0 0 0 / 35%) 0 5px 10px;
+  border-radius: 4px;
+  border: none;
+  outline: none;
+  cursor: pointer;
+}
+
+button:active {
+  color: lightgreen;
+  background-color: gray;
+}
+
+.box {
+  width: 200px;
+  height: 200px;
+  background-color: green;
+  box-shadow: rgb(0 0 0 / 35%) 0 5px 10px;
+  border-radius: 4px;
+}
