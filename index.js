@@ -57,8 +57,6 @@ const MyReact = (Component) => {
       useLayoutEffectIndex = 0;
       useEffectIndex = 0;
       useCallbackIndex = 0;
-      useEffectQueue = [];
-      useLayoutEffectQueue = [];
     },
 
     /**
@@ -68,7 +66,7 @@ const MyReact = (Component) => {
      */
     init() {
       // Calls "render" initially
-      this.render(true);
+      this.render();
     },
 
     /**
@@ -76,45 +74,44 @@ const MyReact = (Component) => {
      *
      * @returns void
      */
-    render(isInit) {
+    render() {
       const result = Component(react);
 
-      if (useLayoutEffectQueue.length === 0) {
-        document.querySelector('#root').innerHTML = result;
+      (function executeRender(isLayout) {
+        if (useLayoutEffectQueue.length === 0) {
+          if (isLayout) {
+            document.querySelector('#root').innerHTML = result;
 
-        if (isInit) {
-          requestAnimationFrame(() => {
             for (let fn of useEffectQueue) {
               fn();
             }
-          });
-        } else {
-          for (let fn of useEffectQueue) {
-            fn();
+
+            useEffectQueue = [];
+          } else {
+            requestAnimationFrame(() => {
+              document.querySelector('#root').innerHTML = result;
+
+              for (let fn of useEffectQueue) {
+                fn();
+              }
+
+              useEffectQueue = [];
+            });
           }
-        }
-      } else {
-        if (isInit) {
-          requestAnimationFrame(() => {
-            for (let fn of useLayoutEffectQueue) {
-              fn();
-            }
-          });
         } else {
           for (let fn of useLayoutEffectQueue) {
             fn();
           }
-        }
-      }
 
-      if (isInit) {
-        // Reset indexes on each render
-        requestAnimationFrame(() => {
-          this.resetIndexes();
-        });
-      } else {
-        this.resetIndexes();
-      }
+          useLayoutEffectQueue = [];
+
+          if (useEffectQueue.length) {
+            executeRender(true);
+          }
+        }
+      })();
+
+      react.resetIndexes();
     },
 
     /**
@@ -179,6 +176,13 @@ const MyReact = (Component) => {
       const currentIndex = useLayoutEffectIndex;
       useLayoutEffectIndex++;
 
+      // If useLayoutEffectDependencies[currentIndex] is null,
+      // that means that the executeCallback is pushed only once
+      // when deps array is [] empty
+      if (useLayoutEffectDependencies[currentIndex] === null) {
+        return;
+      }
+
       const executeCallback = () => {
         let callbackResult = null;
 
@@ -191,33 +195,32 @@ const MyReact = (Component) => {
         useLayoutEffectCallbackCache[currentIndex] = callback();
       };
 
+      // If there is no deps array just add the executeCallback
+      // and return
+      // It's not necessary to go further
       if (!Array.isArray(deps)) {
-        useEffectDependencies[currentIndex] = null;
         useLayoutEffectQueue.push(executeCallback);
 
         return;
       }
 
-      if (useLayoutEffectDependencies[currentIndex] === null) {
-        return;
-      }
-
-      if (!Array.isArray(deps) || deps.length === 0) {
+      // Deps array is [] empty,
+      // so set the useLayoutEffectDependencies[currentIndex] to null
+      if (deps.length === 0) {
         useLayoutEffectDependencies[currentIndex] = null;
         useLayoutEffectQueue.push(executeCallback);
 
         return;
       }
 
+      // hasChange is true only when initially useLayoutEffectDependencies[currentIndex] doesn't exist
+      // or if there is a deps array item change
       const hasChange =
         typeof useLayoutEffectDependencies[currentIndex] === 'undefined' ||
-        (Array.isArray(useLayoutEffectDependencies[currentIndex])
-          ? deps.some(
-              (dep, useLayoutEffectIndex) =>
-                dep !==
-                useLayoutEffectDependencies[currentIndex][useLayoutEffectIndex]
-            )
-          : false);
+        deps.some(
+          (dep, useEffectIndex) =>
+            dep !== useLayoutEffectDependencies[currentIndex][useEffectIndex]
+        );
 
       if (hasChange) {
         useLayoutEffectDependencies[currentIndex] = deps;
@@ -237,6 +240,13 @@ const MyReact = (Component) => {
       const currentIndex = useEffectIndex;
       useEffectIndex++;
 
+      // If useEffectDependencies[currentIndex] is null,
+      // that means that the executeCallback is pushed only once
+      // when deps array is [] empty
+      if (useEffectDependencies[currentIndex] === null) {
+        return;
+      }
+
       const executeCallback = () => {
         let callbackResult = null;
 
@@ -249,32 +259,32 @@ const MyReact = (Component) => {
         useEffectCallbackCache[currentIndex] = callback();
       };
 
+      // If there is no deps array just add the executeCallback
+      // and return
+      // It's not necessary to go further
       if (!Array.isArray(deps)) {
+        useEffectQueue.push(executeCallback);
+
+        return;
+      }
+
+      // Deps array is [] empty,
+      // so set the useEffectDependencies[currentIndex] to null
+      if (deps.length === 0) {
         useEffectDependencies[currentIndex] = null;
         useEffectQueue.push(executeCallback);
 
         return;
       }
 
-      if (useEffectDependencies[currentIndex] === null) {
-        return;
-      }
-
-      if (Array.isArray(deps) && deps.length === 0) {
-        useEffectDependencies[currentIndex] = null;
-        useEffectQueue.push(executeCallback);
-
-        return;
-      }
-
+      // hasChange is true only when initially useEffectDependencies[currentIndex] doesn't exist
+      // or if there is a deps array item change
       const hasChange =
         typeof useEffectDependencies[currentIndex] === 'undefined' ||
-        (Array.isArray(useEffectDependencies[currentIndex])
-          ? deps.some(
-              (dep, useEffectIndex) =>
-                dep !== useEffectDependencies[currentIndex][useEffectIndex]
-            )
-          : false);
+        deps.some(
+          (dep, useEffectIndex) =>
+            dep !== useEffectDependencies[currentIndex][useEffectIndex]
+        );
 
       if (hasChange) {
         useEffectDependencies[currentIndex] = deps;
@@ -326,7 +336,9 @@ const Counter = ({ useCallback, useEffect, useLayoutEffect, useState }) => {
   const [color, setColor] = useState('green');
 
   const onButtonOneClick = useCallback(() => {
-    setCountOne((prevState) => (countTwo !== 0 ? countTwo : prevState + 1));
+    setCountOne((prevState) =>
+      countTwo !== 0 ? prevState + countTwo : prevState + 1
+    );
   }, [countTwo]);
 
   // Add event listeners
@@ -336,6 +348,7 @@ const Counter = ({ useCallback, useEffect, useLayoutEffect, useState }) => {
       .addEventListener('click', onButtonOneClick);
 
     document.querySelector('#button-two').addEventListener('click', () => {
+      setCountTwo((prevState) => prevState + 1);
       setCountTwo((prevState) => prevState + 1);
     });
 
@@ -349,7 +362,6 @@ const Counter = ({ useCallback, useEffect, useLayoutEffect, useState }) => {
     setColor('orange');
   }, [color]);
 
-  /*
   useLayoutEffect(() => {
     console.log('useLayoutEffect countOne: ', countOne);
 
@@ -365,7 +377,6 @@ const Counter = ({ useCallback, useEffect, useLayoutEffect, useState }) => {
       console.log('useEffect return countOne: ', countOne);
     };
   }, [countOne]);
-  */
 
   console.log('RENDER color: ', color);
 
