@@ -79,8 +79,6 @@ const MyReact = (Component) => {
     render(isInit) {
       const result = Component(react);
 
-      console.log('RENDER');
-
       if (useLayoutEffectQueue.length === 0) {
         document.querySelector('#root').innerHTML = result;
 
@@ -346,7 +344,7 @@ const Counter = ({ useCallback, useEffect, useLayoutEffect, useState }) => {
     });
   });
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     blocker();
     setColor('orange');
   }, [color]);
