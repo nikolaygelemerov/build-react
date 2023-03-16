@@ -5,25 +5,20 @@ const blocker = () => {
 };
 
 const MyReact = (Component) => {
+  /* useState START */
+  // Initial useState index
+  let useStateIndex = 0;
+
   // Store state values by index
   let stateValues = {};
 
   // Store setState fn by index
   let setStateCache = {};
+  /* useState END */
 
-  let setStateRAFids = {};
-
-  // Initial useState index
-  let useStateIndex = 0;
-
+  /* useLayoutEffect START */
   // Initial useLayoutEffect index
   let useLayoutEffectIndex = 0;
-
-  // Initial useEffect index
-  let useEffectIndex = 0;
-
-  // Initial useCallback index
-  let useCallbackIndex = 0;
 
   // Store useLayoutEffect deps by index
   let useLayoutEffectDependencies = {};
@@ -31,21 +26,32 @@ const MyReact = (Component) => {
   // Store useLayoutEffectCallback fn by index
   let useLayoutEffectCallbackCache = {};
 
+  let useLayoutEffectQueue = [];
+  /* useLayoutEffect END */
+
+  /* useEffect START */
+  // Initial useEffect index
+  let useEffectIndex = 0;
+
   // Store useEffect deps by index
   let useEffectDependencies = {};
 
   // Store useEffectCallback fn by index
   let useEffectCallbackCache = {};
 
+  let useEffectQueue = [];
+  /* useEffect END */
+
+  /* useCallback START */
+  // Initial useCallback index
+  let useCallbackIndex = 0;
+
   // Store useCallback deps by index
   let useCallbackDependencies = {};
 
   // Store useCallback fn by index
   let useCallbackFnCache = {};
-
-  let useEffectQueue = [];
-
-  let useLayoutEffectQueue = [];
+  /* useCallback END */
 
   const react = {
     /**
@@ -89,13 +95,15 @@ const MyReact = (Component) => {
             useEffectQueue = [];
           } else {
             requestAnimationFrame(() => {
-              document.querySelector('#root').innerHTML = result;
+              requestAnimationFrame(() => {
+                document.querySelector('#root').innerHTML = result;
 
-              for (let fn of useEffectQueue) {
-                fn();
-              }
+                for (let fn of useEffectQueue) {
+                  fn();
+                }
 
-              useEffectQueue = [];
+                useEffectQueue = [];
+              });
             });
           }
         } else {
@@ -144,14 +152,7 @@ const MyReact = (Component) => {
             stateValues[index] = newVal;
           }
 
-          // Trigger "render" inside and RAF callback to validate that
-          // a new "render" will be called on the next RAF callback.
-          // Cancel prev RAFid callback if it is not already executed
-          // in case multiple setStates are called in the same callStack running script.
-          // TODO implement "cancelAnimationFrame" on component unmount.
-          // That groups multiple "setState" calls in a running task
-          setStateRAFids[index] && cancelAnimationFrame(setStateRAFids[index]);
-          setStateRAFids[index] = requestAnimationFrame(() => {
+          queueMicrotask(() => {
             react.render();
           });
         };
@@ -341,23 +342,33 @@ const Counter = ({ useCallback, useEffect, useLayoutEffect, useState }) => {
     );
   }, [countTwo]);
 
+  const onButtonTwoClick = useCallback(() => {
+    setCountTwo((prevState) => prevState + 1);
+    setCountTwo((prevState) => prevState + 1);
+  }, []);
+
+  const onButtonToggleClick = useCallback(() => {
+    setColor('red');
+  }, []);
+
   // Add event listeners
   useEffect(() => {
-    document
-      .querySelector('#button-one')
-      .addEventListener('click', onButtonOneClick);
+    requestAnimationFrame(() => {
+      const buttonOne = document.querySelector('#button-one');
+      buttonOne.removeEventListener('click', onButtonOneClick);
+      buttonOne.addEventListener('click', onButtonOneClick);
 
-    document.querySelector('#button-two').addEventListener('click', () => {
-      setCountTwo((prevState) => prevState + 1);
-      setCountTwo((prevState) => prevState + 1);
-    });
+      const buttonTwo = document.querySelector('#button-two');
+      buttonTwo.removeEventListener('click', onButtonTwoClick);
+      buttonTwo.addEventListener('click', onButtonTwoClick);
 
-    document.querySelector('#button-toggle').addEventListener('click', () => {
-      setColor('red');
+      const buttonToggle = document.querySelector('#button-toggle');
+      buttonToggle.removeEventListener('click', onButtonToggleClick);
+      buttonToggle.addEventListener('click', onButtonToggleClick);
     });
   });
 
-  useLayoutEffect(() => {
+  useEffect(() => {
     blocker();
     setColor('orange');
   }, [color]);
