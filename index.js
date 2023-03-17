@@ -127,29 +127,29 @@ const MyReact = (Component) => {
      *
      * @param { any } initialValue
      *
-     * @returns [any, function]
+     * @returns [ any, function ]
      */
     useState(initialValue) {
       // Set "index" as the current "useStateIndex"
-      const index = useStateIndex;
+      const currentIndex = useStateIndex;
 
       // If there is currently no "index" key in "stateValues",
       // then add one and assign the "initialValue" passed
-      if (!(index in stateValues)) {
-        stateValues[index] =
+      if (!(currentIndex in stateValues)) {
+        stateValues[currentIndex] =
           typeof initialValue === 'function' ? initialValue() : initialValue;
       }
 
       // If there is currently no "index" key in "setStateCache",
       // then add one and assign the "newVal" or
       // "newVal(stateValues[index])" fn call if "newVal" is a function,
-      // executed with "stateValues[index]" value
-      if (!(index in setStateCache)) {
-        setStateCache[index] = (newVal) => {
+      // assigned to "stateValues[index]"
+      if (!(currentIndex in setStateCache)) {
+        setStateCache[currentIndex] = (newVal) => {
           if (typeof newVal === 'function') {
-            stateValues[index] = newVal(stateValues[index]);
+            stateValues[currentIndex] = newVal(stateValues[currentIndex]);
           } else {
-            stateValues[index] = newVal;
+            stateValues[currentIndex] = newVal;
           }
 
           queueMicrotask(() => {
@@ -162,7 +162,7 @@ const MyReact = (Component) => {
       useStateIndex++;
 
       // Return value from "stateValues" and setState from "setStateCache" by index
-      return [stateValues[index], setStateCache[index]];
+      return [stateValues[currentIndex], setStateCache[currentIndex]];
     },
 
     /**
@@ -296,10 +296,10 @@ const MyReact = (Component) => {
     /**
      * @method useCallback
      *
-     * @param {function} fn
-     * @param {array} deps
+     * @param { function } fn
+     * @param { array } deps
      *
-     * @returns void
+     * @returns [ function ]
      */
     useCallback(fn, deps) {
       const currentIndex = useCallbackIndex;
@@ -372,7 +372,7 @@ const Counter = ({ useCallback, useEffect, useLayoutEffect, useState }) => {
   });
 
   useEffect(() => {
-    // blocker();
+    blocker();
     setColor('orange');
   }, [color]);
 
