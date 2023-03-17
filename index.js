@@ -342,8 +342,11 @@ const Counter = ({ useCallback, useEffect, useLayoutEffect, useState }) => {
     );
   }, [countTwo]);
 
-  const onButtonTwoClick = useCallback(() => {
-    setCountTwo((prevState) => prevState + 1);
+  const onButtonTwoClick = useCallback(async () => {
+    console.log('1 countTwo: ', countTwo);
+    await setCountTwo((prevState) => prevState + 1);
+
+    console.log('2 countTwo: ', countTwo);
     setCountTwo((prevState) => prevState + 1);
   }, []);
 
@@ -369,7 +372,7 @@ const Counter = ({ useCallback, useEffect, useLayoutEffect, useState }) => {
   });
 
   useEffect(() => {
-    blocker();
+    // blocker();
     setColor('orange');
   }, [color]);
 
@@ -391,10 +394,14 @@ const Counter = ({ useCallback, useEffect, useLayoutEffect, useState }) => {
 
   console.log('RENDER color: ', color);
 
+  requestAnimationFrame(() => {
+    console.log('RAF');
+  });
+
   return `
     <button id="button-one" type="button">Update Count One ${countOne}</button>
     <button id="button-two" type="button">Update Count Two ${countTwo}</button>
-    <button id="button-toggle" type="button">Toggle Green</button>
+    <button id="button-toggle" type="button">Toggle Box bg-color</button>
     <div class="box" style="background-color: ${color}"></div>
   `;
 };
