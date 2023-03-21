@@ -1,8 +1,24 @@
-const blocker = () => {
+const blocker = (time = 200) => {
   const now = Date.now();
 
-  while (Date.now() < now + 3000) {}
+  while (Date.now() < now + time) {}
 };
+
+let hasQueuedMicrotask = false;
+let latestMicrotask;
+
+function addMicrotask(microtaskFunc) {
+  latestMicrotask = microtaskFunc;
+
+  if (!hasQueuedMicrotask) {
+    hasQueuedMicrotask = true;
+
+    queueMicrotask(() => {
+      hasQueuedMicrotask = false;
+      latestMicrotask();
+    });
+  }
+}
 
 const MyReact = (Component) => {
   /* useState START */
@@ -26,6 +42,7 @@ const MyReact = (Component) => {
   // Store useLayoutEffectCallback fn by index
   let useLayoutEffectCallbackCache = {};
 
+  // Store useLayoutEffect fn in a queue
   let useLayoutEffectQueue = [];
   /* useLayoutEffect END */
 
@@ -39,6 +56,7 @@ const MyReact = (Component) => {
   // Store useEffectCallback fn by index
   let useEffectCallbackCache = {};
 
+  // Store useEffect fn in a queue
   let useEffectQueue = [];
   /* useEffect END */
 
@@ -83,29 +101,19 @@ const MyReact = (Component) => {
     render() {
       const result = Component(react);
 
-      (function executeRender(isLayout) {
+      (function executeRender() {
         if (useLayoutEffectQueue.length === 0) {
-          if (isLayout) {
-            document.querySelector('#root').innerHTML = result;
+          document.querySelector('#root').innerHTML = result;
 
-            for (let fn of useEffectQueue) {
-              fn();
-            }
-
-            useEffectQueue = [];
-          } else {
+          requestAnimationFrame(() => {
             requestAnimationFrame(() => {
-              requestAnimationFrame(() => {
-                document.querySelector('#root').innerHTML = result;
+              for (let fn of useEffectQueue) {
+                fn();
+              }
 
-                for (let fn of useEffectQueue) {
-                  fn();
-                }
-
-                useEffectQueue = [];
-              });
+              useEffectQueue = [];
             });
-          }
+          });
         } else {
           for (let fn of useLayoutEffectQueue) {
             fn();
@@ -152,9 +160,7 @@ const MyReact = (Component) => {
             stateValues[currentIndex] = newVal;
           }
 
-          queueMicrotask(() => {
-            react.render();
-          });
+          addMicrotask(react.render);
         };
       }
 
@@ -342,11 +348,8 @@ const Counter = ({ useCallback, useEffect, useLayoutEffect, useState }) => {
     );
   }, [countTwo]);
 
-  const onButtonTwoClick = useCallback(async () => {
-    console.log('1 countTwo: ', countTwo);
-    await setCountTwo((prevState) => prevState + 1);
-
-    console.log('2 countTwo: ', countTwo);
+  const onButtonTwoClick = useCallback(() => {
+    setCountTwo((prevState) => prevState + 1);
     setCountTwo((prevState) => prevState + 1);
   }, []);
 
@@ -356,23 +359,21 @@ const Counter = ({ useCallback, useEffect, useLayoutEffect, useState }) => {
 
   // Add event listeners
   useEffect(() => {
-    requestAnimationFrame(() => {
-      const buttonOne = document.querySelector('#button-one');
-      buttonOne.removeEventListener('click', onButtonOneClick);
-      buttonOne.addEventListener('click', onButtonOneClick);
+    const buttonOne = document.querySelector('#button-one');
+    buttonOne.removeEventListener('click', onButtonOneClick);
+    buttonOne.addEventListener('click', onButtonOneClick);
 
-      const buttonTwo = document.querySelector('#button-two');
-      buttonTwo.removeEventListener('click', onButtonTwoClick);
-      buttonTwo.addEventListener('click', onButtonTwoClick);
+    const buttonTwo = document.querySelector('#button-two');
+    buttonTwo.removeEventListener('click', onButtonTwoClick);
+    buttonTwo.addEventListener('click', onButtonTwoClick);
 
-      const buttonToggle = document.querySelector('#button-toggle');
-      buttonToggle.removeEventListener('click', onButtonToggleClick);
-      buttonToggle.addEventListener('click', onButtonToggleClick);
-    });
+    const buttonToggle = document.querySelector('#button-toggle');
+    buttonToggle.removeEventListener('click', onButtonToggleClick);
+    buttonToggle.addEventListener('click', onButtonToggleClick);
   });
 
-  useEffect(() => {
-    blocker();
+  useLayoutEffect(() => {
+    blocker(100);
     setColor('orange');
   }, [color]);
 
@@ -393,10 +394,6 @@ const Counter = ({ useCallback, useEffect, useLayoutEffect, useState }) => {
   }, [countOne]);
 
   console.log('RENDER color: ', color);
-
-  requestAnimationFrame(() => {
-    console.log('RAF');
-  });
 
   return `
     <button id="button-one" type="button">Update Count One ${countOne}</button>
