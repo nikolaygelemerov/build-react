@@ -4,22 +4,6 @@ const blocker = (time = 200) => {
   while (Date.now() < now + time) {}
 };
 
-let hasQueuedMicrotask = false;
-let latestMicrotask;
-
-function addMicrotask(microtaskFunc) {
-  latestMicrotask = microtaskFunc;
-
-  if (!hasQueuedMicrotask) {
-    hasQueuedMicrotask = true;
-
-    queueMicrotask(() => {
-      hasQueuedMicrotask = false;
-      latestMicrotask();
-    });
-  }
-}
-
 const MyReact = (Component) => {
   /* useState START */
   // Initial useState index
@@ -71,7 +55,34 @@ const MyReact = (Component) => {
   let useCallbackFnCache = {};
   /* useCallback END */
 
+  /* Microtask queue START */
+
+  let hasQueuedMicrotask = false;
+  let latestMicrotask;
+
+  /* Microtask queue END */
+
   const react = {
+    /**
+     * @method addMicrotask
+     *
+     * @param { function } microtaskFn
+     *
+     * @returns void
+     */
+    addMicrotask: (microtaskFn) => {
+      latestMicrotask = microtaskFn;
+
+      if (!hasQueuedMicrotask) {
+        hasQueuedMicrotask = true;
+
+        queueMicrotask(() => {
+          hasQueuedMicrotask = false;
+          latestMicrotask();
+        });
+      }
+    },
+
     /**
      * @method resetIndexes
      *
@@ -155,7 +166,7 @@ const MyReact = (Component) => {
           if (newValue !== stateValues[currentIndex]) {
             stateValues[currentIndex] = newValue;
 
-            addMicrotask(react.render);
+            react.addMicrotask(react.render);
           }
         };
       }
@@ -221,8 +232,8 @@ const MyReact = (Component) => {
       const hasChange =
         typeof useLayoutEffectDependencies[currentIndex] === 'undefined' ||
         deps.some(
-          (dep, useEffectIndex) =>
-            dep !== useLayoutEffectDependencies[currentIndex][useEffectIndex]
+          (dep, index) =>
+            dep !== useLayoutEffectDependencies[currentIndex][index]
         );
 
       if (hasChange) {
@@ -285,8 +296,7 @@ const MyReact = (Component) => {
       const hasChange =
         typeof useEffectDependencies[currentIndex] === 'undefined' ||
         deps.some(
-          (dep, useEffectIndex) =>
-            dep !== useEffectDependencies[currentIndex][useEffectIndex]
+          (dep, index) => dep !== useEffectDependencies[currentIndex][index]
         );
 
       if (hasChange) {
@@ -306,25 +316,28 @@ const MyReact = (Component) => {
     useCallback(fn, deps) {
       const currentIndex = useCallbackIndex;
       useCallbackIndex++;
-      const hasChange =
-        !Array.isArray(useCallbackDependencies[currentIndex]) ||
-        (Array.isArray(deps) &&
-          deps.some(
-            (dep, index) => dep !== useCallbackDependencies[currentIndex][index]
-          ));
 
-      useCallbackDependencies[currentIndex] = deps;
+      if (!Array.isArray(deps)) {
+        return fn;
+      }
 
-      if (
-        Array.isArray(deps) &&
-        !hasChange &&
-        useCallbackFnCache[currentIndex]
-      ) {
+      if (deps.length === 0 && useCallbackFnCache[currentIndex]) {
         return useCallbackFnCache[currentIndex];
-      } else {
+      }
+
+      const hasChange =
+        typeof useCallbackDependencies[currentIndex] === 'undefined' ||
+        deps.some(
+          (dep, index) => dep !== useCallbackDependencies[currentIndex][index]
+        );
+
+      if (hasChange) {
+        useCallbackDependencies[currentIndex] = deps;
         useCallbackFnCache[currentIndex] = fn;
 
         return fn;
+      } else {
+        return useCallbackFnCache[currentIndex];
       }
     }
   };
