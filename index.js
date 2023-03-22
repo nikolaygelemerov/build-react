@@ -75,6 +75,7 @@ const MyReact = (Component) => {
     /**
      * @method resetIndexes
      *
+     * @returns void
      */
     resetIndexes() {
       useStateIndex = 0;
@@ -90,7 +91,7 @@ const MyReact = (Component) => {
      */
     init() {
       // Calls "render" initially
-      this.render();
+      react.render();
     },
 
     /**
@@ -101,31 +102,23 @@ const MyReact = (Component) => {
     render() {
       const result = Component(react);
 
-      (function executeRender() {
-        if (useLayoutEffectQueue.length === 0) {
-          document.querySelector('#root').innerHTML = result;
+      document.querySelector('#root').innerHTML = result;
 
-          requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-              for (let fn of useEffectQueue) {
-                fn();
-              }
+      requestAnimationFrame(() => {
+        for (let fn of useLayoutEffectQueue) {
+          fn();
+        }
 
-              useEffectQueue = [];
-            });
-          });
-        } else {
-          for (let fn of useLayoutEffectQueue) {
+        useLayoutEffectQueue = [];
+
+        requestAnimationFrame(() => {
+          for (let fn of useEffectQueue) {
             fn();
           }
 
-          useLayoutEffectQueue = [];
-
-          if (useEffectQueue.length) {
-            executeRender(true);
-          }
-        }
-      })();
+          useEffectQueue = [];
+        });
+      });
 
       react.resetIndexes();
     },
@@ -154,13 +147,16 @@ const MyReact = (Component) => {
       // assigned to "stateValues[index]"
       if (!(currentIndex in setStateCache)) {
         setStateCache[currentIndex] = (newVal) => {
-          if (typeof newVal === 'function') {
-            stateValues[currentIndex] = newVal(stateValues[currentIndex]);
-          } else {
-            stateValues[currentIndex] = newVal;
-          }
+          const newValue =
+            typeof newVal === 'function'
+              ? newVal(stateValues[currentIndex])
+              : newVal;
 
-          addMicrotask(react.render);
+          if (newValue !== stateValues[currentIndex]) {
+            stateValues[currentIndex] = newValue;
+
+            addMicrotask(react.render);
+          }
         };
       }
 
@@ -305,7 +301,7 @@ const MyReact = (Component) => {
      * @param { function } fn
      * @param { array } deps
      *
-     * @returns [ function ]
+     * @returns function
      */
     useCallback(fn, deps) {
       const currentIndex = useCallbackIndex;
@@ -338,7 +334,7 @@ const MyReact = (Component) => {
 
 // Example
 const Counter = ({ useCallback, useEffect, useLayoutEffect, useState }) => {
-  const [countOne, setCountOne] = useState(() => 44);
+  const [countOne, setCountOne] = useState(() => 10);
   const [countTwo, setCountTwo] = useState(0);
   const [color, setColor] = useState('green');
 
@@ -360,20 +356,29 @@ const Counter = ({ useCallback, useEffect, useLayoutEffect, useState }) => {
   // Add event listeners
   useEffect(() => {
     const buttonOne = document.querySelector('#button-one');
-    buttonOne.removeEventListener('click', onButtonOneClick);
-    buttonOne.addEventListener('click', onButtonOneClick);
+    const newButtonOne = buttonOne.cloneNode(true);
+    buttonOne.parentNode.replaceChild(newButtonOne, buttonOne);
+    newButtonOne.addEventListener('click', onButtonOneClick);
 
     const buttonTwo = document.querySelector('#button-two');
-    buttonTwo.removeEventListener('click', onButtonTwoClick);
-    buttonTwo.addEventListener('click', onButtonTwoClick);
+    const newButtonTwo = buttonTwo.cloneNode(true);
+    buttonTwo.parentNode.replaceChild(newButtonTwo, buttonTwo);
+    newButtonTwo.addEventListener('click', onButtonTwoClick);
 
     const buttonToggle = document.querySelector('#button-toggle');
-    buttonToggle.removeEventListener('click', onButtonToggleClick);
-    buttonToggle.addEventListener('click', onButtonToggleClick);
+    const newButtonToggle = buttonToggle.cloneNode(true);
+    buttonToggle.parentNode.replaceChild(newButtonToggle, buttonToggle);
+    newButtonToggle.addEventListener('click', onButtonToggleClick);
   });
 
-  useLayoutEffect(() => {
+  useEffect(() => {
     blocker(100);
+
+    // console.log(
+    //   'bg-color: ',
+    //   document.querySelector('.box')?.style?.backgroundColor
+    // );
+
     setColor('orange');
   }, [color]);
 
