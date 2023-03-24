@@ -47,7 +47,7 @@ export const Counter = ({
     newButtonToggle.addEventListener('click', onButtonToggleClick);
   });
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     blocker(100);
 
     // console.log(
