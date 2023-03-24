@@ -31,6 +31,7 @@ server.listen(PORT, () => {
     proxy: `http://localhost:${PORT}`,
     open: true,
     notify: true,
-    files: ['src/**/*']
+    files: ['src/**/*'],
+    favicon: path.resolve(__dirname, 'favicon.ico')
   });
 });
