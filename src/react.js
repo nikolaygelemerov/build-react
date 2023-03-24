@@ -56,7 +56,9 @@ export const React = (Component) => {
 
   /* Microtask queue START */
 
+  // Boolean flag to check if a microtask was already queued
   let hasQueuedMicrotask = false;
+  // Store a reference to the latest microtask
   let latestMicrotask;
 
   /* Microtask queue END */
@@ -72,12 +74,18 @@ export const React = (Component) => {
      * @returns void
      */
     addMicrotask: (microtaskFn) => {
+      // On each call re-assign
       latestMicrotask = microtaskFn;
 
+      // Queue a microtask only once
       if (!hasQueuedMicrotask) {
+        // Set the flag to true
         hasQueuedMicrotask = true;
 
+        // The only queued microtask will execute with
+        // the latest `microtaskFn`
         queueMicrotask(() => {
+          // Reset the flag
           hasQueuedMicrotask = false;
           latestMicrotask();
         });
@@ -104,6 +112,7 @@ export const React = (Component) => {
     init() {
       const result = Component(react);
 
+      // Get the `root` element
       const root = document.querySelector('#root');
 
       // Check if content with the given ID already exists
@@ -119,6 +128,7 @@ export const React = (Component) => {
         root.appendChild(newContent);
       }
 
+      // Call `render` initially
       react.render();
     },
 
@@ -130,25 +140,35 @@ export const React = (Component) => {
     render() {
       const result = Component(react);
 
+      // Get the component container element by `componentId`
       const existingContent = document.querySelector(`#${componentId}`);
       existingContent.innerHTML = result;
 
       requestAnimationFrame(() => {
+        // Execute `useLayoutEffectQueue` effects one by one
+        // in requestAnimationFrame callback
+        // (just before the browser repaints)
         for (let fn of useLayoutEffectQueue) {
           fn();
         }
 
+        // Empty the `useLayoutEffectQueue`
         useLayoutEffectQueue = [];
 
+        // Execute `useEffectQueue` effects one by one
+        // in a nested requestAnimationFrame callback
+        // (just to guarantee that a paint has already occurred)
         requestAnimationFrame(() => {
           for (let fn of useEffectQueue) {
             fn();
           }
 
+          // Empty the `useEffectQueue`
           useEffectQueue = [];
         });
       });
 
+      // Reset indexes after each `render`
       react.resetIndexes();
     },
 
@@ -160,20 +180,23 @@ export const React = (Component) => {
      * @returns [ any, function ]
      */
     useState(initialValue) {
-      // Set "index" as the current "useStateIndex"
+      // Copy the value of `useStateIndex`
       const currentIndex = useStateIndex;
 
-      // If there is currently no "index" key in "stateValues",
-      // then add one and assign the "initialValue" passed
+      // Increment `useStateIndex` on each `useState` call
+      useStateIndex++;
+
+      // If there is currently no `currentIndex` key in `stateValues`,
+      // then add one and assign the `initialValue` passed,
+      // `initialValue` might be a function
       if (!(currentIndex in stateValues)) {
         stateValues[currentIndex] =
           typeof initialValue === 'function' ? initialValue() : initialValue;
       }
 
-      // If there is currently no "index" key in "setStateCache",
+      // If there is currently no `currentIndex` key in `setStateCache`,
       // then add one and assign the "newVal" or
-      // "newVal(stateValues[index])" fn call if "newVal" is a function,
-      // assigned to "stateValues[index]"
+      // "newVal(stateValues[index])" fn call if "newVal" is a function
       if (!(currentIndex in setStateCache)) {
         setStateCache[currentIndex] = (newVal) => {
           const newValue =
@@ -181,6 +204,8 @@ export const React = (Component) => {
               ? newVal(stateValues[currentIndex])
               : newVal;
 
+          // Compare `newValue` and the old one
+          // and re-assign only if they are different
           if (newValue !== stateValues[currentIndex]) {
             stateValues[currentIndex] = newValue;
 
@@ -189,10 +214,7 @@ export const React = (Component) => {
         };
       }
 
-      // Accumulate useStateIndex on each useState call
-      useStateIndex++;
-
-      // Return value from "stateValues" and setState from "setStateCache" by index
+      // Return value from `stateValues` and value setter from `setStateCache` by index
       return [stateValues[currentIndex], setStateCache[currentIndex]];
     },
 
@@ -205,29 +227,33 @@ export const React = (Component) => {
      * @returns void
      */
     useLayoutEffect(callback, deps) {
+      // Copy the value of `useLayoutEffectIndex`
       const currentIndex = useLayoutEffectIndex;
+
+      // Increment `useLayoutEffectIndex` on each `useLayoutEffect` call
       useLayoutEffectIndex++;
 
-      // If useLayoutEffectDependencies[currentIndex] is null,
-      // that means that the executeCallback is pushed only once
-      // when deps array is [] empty
+      // If `useLayoutEffectDependencies[currentIndex]` is null,
+      // it means that `executeCallback` is pushed only once
+      // when `deps` array is [] empty
       if (useLayoutEffectDependencies[currentIndex] === null) {
         return;
       }
 
       const executeCallback = () => {
-        let callbackResult = null;
+        // Get the previous `callback` cleanup function
+        const prevCallbackCleanup = useLayoutEffectCallbackCache[currentIndex];
 
-        callbackResult = useLayoutEffectCallbackCache[currentIndex];
-
-        if (typeof callbackResult === 'function') {
-          callbackResult();
+        // If `prevCallbackCleanup` is a function, execute it
+        if (typeof prevCallbackCleanup === 'function') {
+          prevCallbackCleanup();
         }
 
+        // Re-assign the new `callback` cleanup function
         useLayoutEffectCallbackCache[currentIndex] = callback();
       };
 
-      // If there is no deps array just add the executeCallback
+      // If `deps` is not an array just add the `executeCallback`
       // and return
       // It's not necessary to go further
       if (!Array.isArray(deps)) {
@@ -236,8 +262,11 @@ export const React = (Component) => {
         return;
       }
 
-      // Deps array is [] empty,
-      // so set the useLayoutEffectDependencies[currentIndex] to null
+      // If `deps` array is [] empty, then set
+      // `useLayoutEffectDependencies[currentIndex]` to null,
+      // add the `executeCallback`
+      // and return
+      // It's not necessary to go further
       if (deps.length === 0) {
         useLayoutEffectDependencies[currentIndex] = null;
         useLayoutEffectQueue.push(executeCallback);
@@ -245,8 +274,8 @@ export const React = (Component) => {
         return;
       }
 
-      // hasChange is true only when initially useLayoutEffectDependencies[currentIndex] doesn't exist
-      // or if there is a deps array item change
+      // `hasChange` is true only when initially `useLayoutEffectDependencies[currentIndex]` doesn't exist
+      // or if there is a `deps` array item change
       const hasChange =
         typeof useLayoutEffectDependencies[currentIndex] === 'undefined' ||
         deps.some(
@@ -254,6 +283,9 @@ export const React = (Component) => {
             dep !== useLayoutEffectDependencies[currentIndex][index]
         );
 
+      // If `hasChange` is true
+      // re-assign `deps` array per index,
+      // add the `executeCallback` into the queue
       if (hasChange) {
         useLayoutEffectDependencies[currentIndex] = deps;
         useLayoutEffectQueue.push(executeCallback);
@@ -269,29 +301,33 @@ export const React = (Component) => {
      * @returns void
      */
     useEffect(callback, deps) {
+      // Copy the value of `useEffectIndex`
       const currentIndex = useEffectIndex;
+
+      // Increment `useEffectIndex` on each `useEffect` call
       useEffectIndex++;
 
       // If useEffectDependencies[currentIndex] is null,
-      // that means that the executeCallback is pushed only once
-      // when deps array is [] empty
+      // it means that `executeCallback` is pushed only once
+      // when `deps` array is [] empty
       if (useEffectDependencies[currentIndex] === null) {
         return;
       }
 
       const executeCallback = () => {
-        let callbackResult = null;
+        // Get the previous `callback` cleanup function
+        const prevCallbackCleanup = useEffectCallbackCache[currentIndex];
 
-        callbackResult = useEffectCallbackCache[currentIndex];
-
-        if (typeof callbackResult === 'function') {
-          callbackResult();
+        // If `prevCallbackCleanup` is a function, execute it
+        if (typeof prevCallbackCleanup === 'function') {
+          prevCallbackCleanup();
         }
 
+        // Re-assign the new `callback` cleanup function
         useEffectCallbackCache[currentIndex] = callback();
       };
 
-      // If there is no deps array just add the executeCallback
+      // If `deps` is not an array just add the `executeCallback`
       // and return
       // It's not necessary to go further
       if (!Array.isArray(deps)) {
@@ -300,8 +336,11 @@ export const React = (Component) => {
         return;
       }
 
-      // Deps array is [] empty,
-      // so set the useEffectDependencies[currentIndex] to null
+      // If `deps` array is [] empty, then set
+      // `useEffectDependencies[currentIndex]` to null,
+      // add the `executeCallback`
+      // and return
+      // It's not necessary to go further
       if (deps.length === 0) {
         useEffectDependencies[currentIndex] = null;
         useEffectQueue.push(executeCallback);
@@ -309,14 +348,17 @@ export const React = (Component) => {
         return;
       }
 
-      // hasChange is true only when initially useEffectDependencies[currentIndex] doesn't exist
-      // or if there is a deps array item change
+      // `hasChange` is true only when initially `useEffectDependencies[currentIndex]` doesn't exist
+      // or if there is a `deps` array item change
       const hasChange =
         typeof useEffectDependencies[currentIndex] === 'undefined' ||
         deps.some(
           (dep, index) => dep !== useEffectDependencies[currentIndex][index]
         );
 
+      // If `hasChange` is true
+      // re-assign `deps` array per index,
+      // add the `executeCallback` into the queue
       if (hasChange) {
         useEffectDependencies[currentIndex] = deps;
         useEffectQueue.push(executeCallback);
@@ -332,17 +374,25 @@ export const React = (Component) => {
      * @returns function
      */
     useCallback(fn, deps) {
+      // Copy the value of `useCallbackIndex`
       const currentIndex = useCallbackIndex;
+
+      // Increment `useCallbackIndex` on each `useCallback` call
       useCallbackIndex++;
 
+      // If `deps` is not an array just return the new `fn`
       if (!Array.isArray(deps)) {
         return fn;
       }
 
+      // If `deps` array is [] empty and there is a cached function,
+      // then return the cached function
       if (deps.length === 0 && useCallbackFnCache[currentIndex]) {
         return useCallbackFnCache[currentIndex];
       }
 
+      // `hasChange` is true only when initially `useCallbackDependencies[currentIndex]` doesn't exist
+      // or if there is a `deps` array item change
       const hasChange =
         typeof useCallbackDependencies[currentIndex] === 'undefined' ||
         deps.some(
@@ -350,11 +400,16 @@ export const React = (Component) => {
         );
 
       if (hasChange) {
+        // `hasChange` is true
+        // re-assign `deps` array per index,
+        // re-assign `fn` per index
         useCallbackDependencies[currentIndex] = deps;
         useCallbackFnCache[currentIndex] = fn;
 
         return fn;
       } else {
+        // `hasChange` is false
+        // return the cached function
         return useCallbackFnCache[currentIndex];
       }
     }
